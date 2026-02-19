@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+*.zip
+facebook/
+SKILL.md
+SKILL_BAK.md
+.env
+.npmrc
+debug.log
+storage/
+temp/

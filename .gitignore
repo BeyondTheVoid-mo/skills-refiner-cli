@@ -1,0 +1,14 @@
+node_modules/
+.DS_Store
+*.tgz
+*.zip
+.env
+debug.log
+config.json
+# 忽略测试资产
+facebook/
+anthropics/
+openclaw/
+# 忽略本地临时生成的重构文件
+SKILL.md
+SKILL_BAK.md

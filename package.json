@@ -1,0 +1,29 @@
+{
+  "name": "skills-refiner",
+  "version": "1.0.3",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "skills-refiner": "bin/skills-refiner.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Skill Refiner Team",
+  "license": "ISC",
+  "description": "A geeky CLI tool to refine and translate SKILL.md for AI Agents.",
+  "dependencies": {
+    "@inquirer/prompts": "^8.2.0",
+    "adm-zip": "^0.5.16",
+    "axios": "^1.13.5",
+    "chalk": "^5.6.2",
+    "cli-table3": "^0.6.5",
+    "commander": "^14.0.3",
+    "conf": "^15.1.0",
+    "node-machine-id": "^1.1.12",
+    "open": "^11.0.0",
+    "ora": "^9.3.0",
+    "os-locale": "^8.0.0"
+  }
+}
