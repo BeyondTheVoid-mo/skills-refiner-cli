@@ -1,50 +1,52 @@
 # Skill Refiner CLI 🚀
 
-**Skill Refiner CLI** 是一个为 AI 工程师打造的终端工具，旨在通过自动化的语言转译与逻辑重构（CoT），让你的 `SKILL.md` 文件在 AI 引擎中发挥最大效能。
+[中文文档](./README_zh.md)
 
-## 🌟 核心特性
+**Skill Refiner CLI** is a terminal tool built for AI engineers, designed to maximize the effectiveness of your `SKILL.md` files in AI engines through automated language translation and logic reconstruction (CoT).
 
-- **母语思维**：支持中文编写逻辑，一键重构为地道的 AI 原生指令（English context）。
-- **逻辑升维**：自动重构为思维链（Chain of Thought）结构，提升 Agent 执行成功率。
-- **全量下载**：不仅是 SKILL.md，支持递归下载 GitHub 技能库的所有子目录。
-- **隐私优先**：你的 **API Key 仅存储在本地**。
-- **极简认证**：支持自动浏览器回调登录，无需手动粘贴 Key。
+## 🌟 Key Features
 
-## 📦 安装
+- **Native Thinking**: Write logic in your native language (e.g., Chinese) and reconstruct it into authentic AI-native instructions (English context) with one click.
+- **Logic Elevation**: Automatically reconstruct into Chain of Thought (CoT) structures to significantly improve Agent task success rates.
+- **Full Package Download**: Not just `SKILL.md`—supports recursive downloading of all subdirectories from the GitHub skill repository.
+- **Privacy First**: Your **API Key is only stored locally**.
+- **Minimalist Authentication**: Supports automatic browser callback login, no manual copy-pasting required.
+
+## 📦 Installation
 
 ```bash
 npm install -g skills-refiner
 ```
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 1. 登录
-只需运行重构命令，如果点数不足，CLI 会指引你完成登录：
+### 1. Login & Auth
+Simply run the refinement command. If points are insufficient, the CLI will guide you through the login process:
 ```bash
 skills-refiner -l zh-CN
 ```
 
-### 2. 下载并重构技能
+### 2. Download & Refine a Skill
 ```bash
-# 下载指定技能并重构为中文
+# Download a specific skill and refine it into Chinese
 skills-refiner facebook/react -l zh-CN
 ```
 
-### 3. 本地重构
-在包含 `SKILL.md` 的目录下运行：
+### 3. Local Refinement
+Run in a directory containing `SKILL.md`:
 ```bash
 skills-refiner -l zh-CN
 ```
 
-## 🔒 隐私声明
+## 🔒 Privacy Statement
 
-1. **API Key 存储**：您的 API Key 使用 [conf](https://github.com/sindresorhus/conf) 存储在您本地的系统配置目录下（由 OS 保护）。
-2. **数据传输**：仅在执行重构任务时，会将 `SKILL.md` 内容发送至我们的服务器进行 AI 处理。
-3. **设备 ID**：匿名生成的设备 ID 仅用于访客额度统计。
+1. **API Key Storage**: Your API Key is stored in your local system configuration directory using [conf](https://github.com/sindresorhus/conf), protected by the OS.
+2. **Data Transmission**: `SKILL.md` content is sent to our servers for AI processing ONLY during refinement tasks.
+3. **Device ID**: Anonymously generated device IDs are used solely for visitor quota tracking.
 
-## 🛠 开发与贡献
+## 🛠 Development & Contribution
 
-欢迎提交 Issue 或 Pull Request！
+Issues and Pull Requests are welcome!
 
 ```bash
 git clone https://github.com/BeyondTheVoid-mo/skills-refiner.git
@@ -53,6 +55,6 @@ npm install
 npm link
 ```
 
-## 📄 开源协议
+## 📄 License
 
 [MIT License](./LICENSE)
