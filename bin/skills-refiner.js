@@ -16,18 +16,54 @@ import axios from 'axios';
 import { select, password } from '@inquirer/prompts';
 import AdmZip from 'adm-zip';
 import http from 'http';
-import dotenv from 'dotenv';
+import https from 'https';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const program = new Command();
 const config = new Conf({ projectName: 'skills-refiner' });
 
 const API_BASE = process.env.API_URL || 'https://skills-refiner.com/api/v1';
-// console.log(chalk.gray(`[DEBUG] Current API Environment: ${API_BASE}`));
+
+// Derive WEB_BASE from API_URL to support dynamic environments
+let WEB_BASE = process.env.WEB_URL;
+if (!WEB_BASE) {
+  WEB_BASE = API_BASE.replace('/api/v1', '');
+  // Specifically map localhost:3000 (API) to 3001 (Web) for local dev
+  if (WEB_BASE.includes('localhost:3000')) {
+    WEB_BASE = WEB_BASE.replace('localhost:3000', 'localhost:3001');
+  }
+}
+
+// Create a custom axios instance with SSL handling
+const apiClient = axios.create({
+  baseURL: API_BASE,
+  httpsAgent: new https.Agent({
+    // Trust the config file, or fallback to standard env check
+    rejectUnauthorized: config.get('ignore_ssl') ? false : (process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0')
+  })
+});
+
+// Helper to handle Axios errors with SSL-specific hints
+function handleAxiosError(err, spinner = null) {
+  if (spinner) spinner.stop();
+
+  if (err.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' || err.code === 'CERT_HAS_EXPIRED' || err.message.includes('certificate')) {
+    console.log(chalk.red(`\n[网络错误] 检测到 SSL 证书校验失败 / SSL Certificate Error: ${err.message}`));
+    console.log(chalk.yellow(`👉 提示：这通常是因为你正在使用 VPN 或代理工具（如 Clash, V2Ray 等）拦截了请求。`));
+    console.log(chalk.cyan(`🛠  解决方案：运行 \`skills-refiner config\`，选择 "Ignore SSL Verification" 并开启。`));
+    console.log(chalk.dim(`   (临时解决: export NODE_TLS_REJECT_UNAUTHORIZED=0)`));
+  } else if (err.response && err.response.data) {
+    console.log(chalk.red(`\nAPI Error: ${err.response.data.error || 'Unknown error'}`));
+    if (err.response.data.message) {
+      console.log(chalk.yellow(`Hint: ${err.response.data.message}`));
+    }
+  } else {
+    console.log(chalk.red(`\nNetwork Error: ${err.message}`));
+  }
+}
 
 async function getLanguage() {
   return config.get('default_lang') || await detectOSLocale();
@@ -59,8 +95,10 @@ async function getDeviceId() {
 async function handleServerAction(data) {
   if (!data.action) return false;
 
+  if (!data.action) return false;
+
   const action = data.action;
-  const message = data.message || data.error || 'Action required';
+  const message = data.message || action.message || data.error || 'Action required';
 
   switch (action.type) {
     case 'OPEN_LOGIN':
@@ -169,12 +207,13 @@ async function refineContent(content, lang, slugForDisplay = 'local', version = 
   const apiKey = config.get('api_key');
 
   try {
-    const response = await axios.post(`${API_BASE}/compile`, {
+    const response = await apiClient.post(`/compile`, {
       content,
       target_lang: lang,
       command: 'refine',
       client_type: 'cli',
-      client_version: version
+      client_version: version,
+      web_base: WEB_BASE
     }, {
       headers: {
         'X-Device-ID': deviceId,
@@ -183,6 +222,7 @@ async function refineContent(content, lang, slugForDisplay = 'local', version = 
     });
 
     spinner.succeed(chalk.green(`Refined successfully!`));
+    // ... (rest of score logic)
 
     const { original_score, refined_score, diff_summary } = response.data;
     if (original_score !== undefined && refined_score !== undefined) {
@@ -216,17 +256,12 @@ async function refineContent(content, lang, slugForDisplay = 'local', version = 
 
     return response.data.refined_content;
   } catch (err) {
-    spinner.stop();
-    if (err.response && err.response.data) {
+    if (err.response && err.response.data && err.response.data.action) {
+      spinner.stop();
       const handled = await handleServerAction(err.response.data);
       if (handled) return null;
-      console.log(chalk.red(`\nAPI Error: ${err.response.data.error || 'Unknown error'}`));
-      if (err.response.data.message) {
-        console.log(chalk.yellow(`Hint: ${err.response.data.message}`));
-      }
-    } else {
-      console.log(chalk.red(`\nNetwork Error: ${err.message}`));
     }
+    handleAxiosError(err, spinner);
     process.exit(1);
   }
 }
@@ -234,7 +269,7 @@ async function refineContent(content, lang, slugForDisplay = 'local', version = 
 async function downloadAndExtractSkill(slug, targetDir, refinedContent = null) {
   const spinner = ora(chalk.cyan(`Downloading full skill bundle [${slug}]...`)).start();
   try {
-    const response = await axios.post(`${API_BASE}/cli/skills/${slug}/download`, {
+    const response = await apiClient.post(`/cli/skills/${slug}/download`, {
       refined_content: refinedContent
     }, {
       responseType: 'arraybuffer',
@@ -245,7 +280,7 @@ async function downloadAndExtractSkill(slug, targetDir, refinedContent = null) {
     zip.extractAllTo(targetDir, true);
     spinner.succeed(chalk.green(`Skill [${slug}] downloaded and extracted to ${targetDir}`));
   } catch (err) {
-    spinner.fail(chalk.red(`Failed to download skill bundle: ${err.message}`));
+    handleAxiosError(err, spinner);
     process.exit(1);
   }
 }
@@ -290,14 +325,19 @@ async function downloadAndExtractSkill(slug, targetDir, refinedContent = null) {
         // --- 3. Scenario A: Download specific skill ---
         if (skillName) {
           // Fetch metadata first to ensure it exists
-          const skillMeta = await axios.get(`${API_BASE}/cli/skills/${skillName}`);
-          if (!skillMeta.data.success) {
-            console.log(chalk.red(`Skill not found: ${skillName}`));
+          try {
+            const skillMeta = await apiClient.get(`/cli/skills/${skillName}`);
+            skillObject = skillMeta.data.data;
+            content = skillObject.content;
+            console.log(chalk.green(`Skill [${skillName}] found.`));
+          } catch (err) {
+            if (err.response && err.response.data && err.response.data.action) {
+              const handled = await handleServerAction(err.response.data);
+              if (handled) process.exit(0);
+            }
+            handleAxiosError(err);
             process.exit(1);
           }
-          skillObject = skillMeta.data.data;
-          content = skillObject.content;
-          console.log(chalk.green(`Skill [${skillName}] found.`));
         } else {
           // --- 4. Scenario B: Local File Refinement ---
           const localPath = path.resolve(process.cwd(), 'SKILL.md');
@@ -371,6 +411,7 @@ async function downloadAndExtractSkill(slug, targetDir, refinedContent = null) {
           choices: [
             { name: 'Default Language', value: 'lang' },
             { name: 'API Key', value: 'key' },
+            { name: 'Ignore SSL Verification (VPN/Proxy User)', value: 'ssl' },
             { name: 'Exit', value: 'exit' }
           ]
         });
@@ -392,6 +433,17 @@ async function downloadAndExtractSkill(slug, targetDir, refinedContent = null) {
             config.set('api_key', key);
             console.log(chalk.green('API Key updated!'));
           }
+        } else if (choice === 'ssl') {
+          const ignore = await select({
+            message: 'Disable SSL verification? (Turn on if you use VPN/Proxy)',
+            choices: [
+              { name: 'Yes, disable it (VPN User)', value: true },
+              { name: 'No, keep it secure (Default)', value: false }
+            ],
+            default: config.get('ignore_ssl') || false
+          });
+          config.set('ignore_ssl', ignore);
+          console.log(chalk.green(`SSL Verification check is now ${ignore ? 'Disabled' : 'Enabled'}.`));
         }
       });
 
@@ -412,7 +464,7 @@ async function downloadAndExtractSkill(slug, targetDir, refinedContent = null) {
         const apiKey = config.get('api_key');
 
         try {
-          const response = await axios.get(`${API_BASE}/cli/balance`, {
+          const response = await apiClient.get(`/cli/balance`, {
             headers: {
               'X-Device-ID': deviceId,
               'Authorization': apiKey ? `Bearer ${apiKey}` : undefined
@@ -421,6 +473,7 @@ async function downloadAndExtractSkill(slug, targetDir, refinedContent = null) {
 
           spinner.stop();
           const { isFreeUser, dailyLimit, todayUsageCount, balance } = response.data.data;
+          // ... (rest of balance display logic)
 
           console.log(`\n  ${chalk.bold('Account Balance')}`);
           console.log(`  ${chalk.dim('─').repeat(35)}`);
@@ -437,12 +490,7 @@ async function downloadAndExtractSkill(slug, targetDir, refinedContent = null) {
           }
 
         } catch (err) {
-          spinner.stop();
-          if (err.response && err.response.data) {
-            console.log(chalk.red(`\nAPI Error: ${err.response.data.error || 'Unknown error'}`));
-          } else {
-            console.log(chalk.red(`\nNetwork Error: ${err.message}`));
-          }
+          handleAxiosError(err, spinner);
           process.exit(1);
         }
       });

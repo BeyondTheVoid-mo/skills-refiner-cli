@@ -1,6 +1,6 @@
 # Skill Refiner CLI 🚀
 
-[English Version](./README.md)
+[官方网站](https://skills-refiner.com) | [English Version](./README.md)
 
 **Skill Refiner CLI** 是一个为 AI 工程师打造的终端工具，旨在通过自动化的语言转译与逻辑重构（CoT），让你的 `SKILL.md` 文件在 AI 引擎中发挥最大效能。
 
